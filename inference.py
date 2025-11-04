@@ -3,7 +3,14 @@ import argparse
 import torch
 import numpy as np
 
-from net import SUM, load_and_preprocess_image, predict_saliency_map, overlay_heatmap_on_image, write_heatmap_to_image
+from net import (
+    SUM,
+    load_and_preprocess_image,
+    predict_saliency_map,
+    overlay_heatmap_on_image,
+    write_heatmap_to_image,
+    SaliencyMap,
+)
 from net.configs.config_setting import setting_config
 
 
@@ -49,8 +56,9 @@ def main():
     filename = os.path.splitext(os.path.basename(args.img_path))[0]
     tensor_output_filename = os.path.join(args.output_path, f'{filename}_saliency.npy')
     if args.tensor_output:
-        np.save(tensor_output_filename, pred_saliency)
-        print(f"Saved raw saliency tensor to {tensor_output_filename}")
+        resized_saliency = SaliencyMap(pred_saliency, orig_size).map
+        np.save(tensor_output_filename, resized_saliency)
+        print(f"Saved resized saliency tensor ({resized_saliency.shape[1]}x{resized_saliency.shape[0]}) to {tensor_output_filename}")
 
     hot_output_filename = os.path.join(args.output_path, f'{filename}_saliencymap.png')
 

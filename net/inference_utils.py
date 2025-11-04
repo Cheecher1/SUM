@@ -1,4 +1,5 @@
 import io
+from typing import Tuple
 from PIL import Image
 import torchvision.transforms as transforms
 import torch
@@ -31,6 +32,48 @@ def predict_saliency_map(img, condition, model, device):
 
     pred_saliency = pred_saliency.squeeze().cpu().numpy()
     return pred_saliency
+
+
+class SaliencyMap:
+    """Utility to project a 256x256 SUM saliency tensor back onto the source image."""
+
+    def __init__(self, saliency_tensor: np.ndarray, orig_size: Tuple[int, int]):
+        if saliency_tensor.ndim != 2:
+            raise ValueError("saliency_tensor must be a 2D array")
+        width, height = map(int, orig_size)
+        if width <= 0 or height <= 0:
+            raise ValueError("orig_size must be positive integers (width, height)")
+
+        self.width = width
+        self.height = height
+        # Keep a float32 copy to avoid repeated casting when querying many points.
+        self._map = cv2.resize(
+            saliency_tensor.astype(np.float32),
+            (self.width, self.height),
+            interpolation=cv2.INTER_LINEAR,
+        )
+
+    @classmethod
+    def from_npy(cls, npy_path: str, orig_size: Tuple[int, int]) -> "SaliencyMap":
+        """Load a `.npy` tensor saved with `--tensor_output` and resize it."""
+        saliency_tensor = np.load(npy_path)
+        return cls(saliency_tensor, orig_size)
+
+    @property
+    def map(self) -> np.ndarray:
+        """Return the resized saliency array aligned with the original image pixels."""
+        return self._map
+
+    def get_saliency(self, x: int, y: int) -> float:
+        """Look up the saliency score at integer pixel coordinates (x, y)."""
+        if not (0 <= x < self.width) or not (0 <= y < self.height):
+            raise ValueError(f"Coordinates ({x}, {y}) out of bounds for {self.width}x{self.height} map")
+        return float(self._map[y, x])
+
+    def get_saliency_percent(self, x: int, y: int) -> Tuple[float, float, float]:
+        """Return (score, x_pct, y_pct) for convenience when mapping to layouts."""
+        score = self.get_saliency(x, y)
+        return score, x / self.width, y / self.height
 
 
 def overlay_heatmap_on_image(original_img_path, heatmap_img_path, output_img_path):
