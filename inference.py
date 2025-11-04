@@ -1,6 +1,7 @@
 import os
 import argparse
 import torch
+import numpy as np
 
 from net import SUM, load_and_preprocess_image, predict_saliency_map, overlay_heatmap_on_image, write_heatmap_to_image
 from net.configs.config_setting import setting_config
@@ -30,6 +31,7 @@ def main():
     parser.add_argument('--condition', type=int, required=True, choices=[0, 1, 2, 3])
     parser.add_argument('--output_path', type=str, default='results')
     parser.add_argument('--heat_map_type', type=str, default='HOT', choices=['HOT', 'Overlay'], help='Type of heatmap: HOT or Overlay')
+    parser.add_argument('--tensor_output', action='store_true', help='Save raw saliency tensor as a NumPy file.')
     parser.add_argument('--from_pretrained', type=str)
     args = parser.parse_args()
 
@@ -45,6 +47,11 @@ def main():
     pred_saliency = predict_saliency_map(img, args.condition, model, device)
 
     filename = os.path.splitext(os.path.basename(args.img_path))[0]
+    tensor_output_filename = os.path.join(args.output_path, f'{filename}_saliency.npy')
+    if args.tensor_output:
+        np.save(tensor_output_filename, pred_saliency)
+        print(f"Saved raw saliency tensor to {tensor_output_filename}")
+
     hot_output_filename = os.path.join(args.output_path, f'{filename}_saliencymap.png')
 
     write_heatmap_to_image(pred_saliency, orig_size, hot_output_filename)
